@@ -1,0 +1,145 @@
+name: Basic API call (TypeScript) (1)
+description: Performs a basic Word API call using TypeScript.
+host: WORD
+api_set: {}
+script:
+  content: |
+    const DP_JudgmentName = "JudgmentName";
+    const DP_JudgmentNumber = "JudgmentNumber";
+    const DP_JudgmentAuthor = "JudgmentAuthor";
+
+    var xmlDoc;
+    var $xml;
+
+    var settings = {
+      namespace: "http://schemas.microsoft.com/office/2006/metadata/properties",
+      xpathroot: "/ns0:properties[1]/documentManagement[1]",
+      xmlstring: "",
+      status: null,
+      error: null
+    };
+
+    getCustomDocumentProperties(loadProperties);
+
+    $("#run").click(() => tryCatch(saveProperties));
+
+    function loadProperties(content, success) {
+      // help function to extract node values from XML returned from Word
+      console.log('old xml = ' + content);
+      xmlDoc = $.parseXML(content);
+      $xml = $(xmlDoc);
+
+      var jn = $xml.find(DP_JudgmentNumber);
+      var ja = $xml.find(DP_JudgmentAuthor);
+      var title = $xml.find(DP_JudgmentName);
+
+      console.log('old name = ' + title[0].outerHTML);
+      console.log('old number = ' + jn[0].outerHTML);
+      console.log('old author = ' + ja[0].outerHTML);
+
+      title.text("APPLES v PEARS");
+
+      // remove element value and nullify
+      jn.empty();
+      jn.attr("xmlns:xsi", "http://www.w3.org/2001/XMLSchema-instance");
+      jn.attr("xsi:nil", "true");
+
+
+      // give element a valid value
+      ja.text('Ben McInerney');
+      ja.removeAttr('xmlns:xsi');
+      ja.removeAttr('xsi:nil');
+
+      console.log('new name = ' + title[0].outerHTML);
+      console.log('new number = ' + jn[0].outerHTML);
+      console.log('new author = ' + ja[0].outerHTML);
+
+    }
+
+
+    function saveProperties() {
+      var x = ($xml.find('*').html()).toString();
+      console.log('new xml = ' + x);
+      setCustomDocumentProperties(x);
+    }
+
+
+    function getCustomDocumentProperties(callback) {
+      Office.context.document.customXmlParts.getByNamespaceAsync(settings.namespace, function (result) {
+        if (result.status == Office.AsyncResultStatus.Failed) {
+          callback(result.error, false);
+        } else {
+          var xpart = result.value[0];
+          xpart.getXmlAsync(function (result) {
+            callback(result.value, true);
+          });
+        }
+      });
+    }
+
+    async function setCustomDocumentProperties(xmlstring: string) {
+      Word.run(async (context) => {
+        Office.context.document.customXmlParts.getByNamespaceAsync(settings.namespace, function (parts) {
+          if (parts.status == Office.AsyncResultStatus.Failed) {
+            console.log("Namespace: " + parts.error.message);
+          }
+          else {
+            var xpart = parts.value[0];
+            xpart.getNodesAsync(settings.xpathroot, function (nodes) {
+              if (nodes.status == Office.AsyncResultStatus.Failed) {
+                console.log("GetNode: " + nodes.status + " / " + nodes.error.message);
+              }
+              else {
+                var node = nodes.value[0];
+                node.setXmlAsync(xmlstring, { asyncContext: "StateNormal" }, function (setResult) {
+                  if (setResult.status == Office.AsyncResultStatus.Failed) {
+                    console.log("FAILED with: " + setResult.error.code + ' ' + setResult.error.message);
+                  } else {
+                    console.log("Success!");
+                  }
+                });
+              }
+            });
+          }
+        });
+      });
+    }
+
+
+    /** Default helper for invoking an action and handling errors. */
+    async function tryCatch(callback) {
+      try {
+        await callback();
+      } catch (error) {
+        console.error(error);
+      }
+    }
+  language: typescript
+template:
+  content: "<section class=\"ms-font-m\">\n\tThis sample executes a code snippet that prints the selected text to the console. Make sure to enter and select text\n\tbefore clicking \"Update Properties\".\n</section>\n<button id=\"run\" class=\"ms-Button\">\n    <span class=\"ms-Button-label\">Update Properties</span>\n</button>"
+  language: html
+style:
+  content: |-
+    section.samples {
+        margin-top: 20px;
+    }
+
+    section.samples .ms-Button, section.setup .ms-Button {
+        display: block;
+        margin-bottom: 5px;
+        margin-left: 20px;
+        min-width: 80px;
+    }
+  language: css
+libraries: |
+  https://appsforoffice.microsoft.com/lib/1/hosted/office.js
+  @types/office-js
+
+  office-ui-fabric-js@1.4.0/dist/css/fabric.min.css
+  office-ui-fabric-js@1.4.0/dist/css/fabric.components.min.css
+
+  core-js@2.4.1/client/core.min.js
+  @types/core-js
+
+  jquery@3.1.1
+  @types/jquery@3.3.1
